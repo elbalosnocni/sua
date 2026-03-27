@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tra cứu sữa</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    input { padding: 10px; width: 300px; }
+    button { padding: 10px; }
+    .card { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>🔍 Tra cứu sữa</h2>
+
+<input type="text" id="search" placeholder="Nhập tên hoặc mã NV">
+<button onclick="search()">Tìm</button>
+
+<div id="result"></div>
+
+<script>
+const API = "https://script.google.com/macros/s/AKfycbzaA5c9l0s4X1FUaFasiY31B7fF4sFjpLM1WK8QeTH54zpjytVXUdK7klAjUPxlLXw-1g/exec";
+//thêm hàm bỏ dấu
+function removeVietnameseTones(str) {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+}  
+  
+function search() {
+  const input = document.getElementById("search").value;
+  const q = removeVietnameseTones(input);
+
+  fetch(API + "?q=" + encodeURIComponent(q))
+    .then(res => res.json())
+    .then(data => {
+      const div = document.getElementById("result");
+      div.innerHTML = "";
+
+      if (data.length === 0) {
+        div.innerHTML = "❌ Không tìm thấy";
+        return;
+      }
+
+      data.forEach(item => {
+        div.innerHTML += `
+          <div class="card">
+            <b>${item.ten}</b><br>
+            Mã NV: ${item.ma}<br>
+            Số hộp: ${item.soHop}<br>
+            Tháng chưa nhận: ${item.thang}<br>
+            Phòng: ${item.phong}
+          </div>
+        `;
+      });
+    });
+}
+</script>
+
+</body>
+</html>
