@@ -7,15 +7,43 @@
 
   <style>
     body {
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       padding: 15px;
       background: #f5f6fa;
     }
-
+    .nav-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 20px auto;
+    }
+    .nav-tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 22px;
+      border-radius: 30px;
+      background: #fff;
+      color: #334155;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid #e5e7eb;
+      transition: .25s;
+    }
+    .nav-tab:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 18px rgba(0,0,0,.12);
+      color: #2563eb;
+    }
+    .nav-tab.active {
+      background: linear-gradient(135deg,#2563eb,#1e40af);
+      color: #fff;
+      border: none;
+    }
     h2 {
       text-align: center;
     }
-
     input {
       padding: 12px;
       width: 100%;
@@ -25,8 +53,8 @@
       border-radius: 8px;
       border: 1px solid #ccc;
       font-size: 16px;
+      box-sizing: border-box;
     }
-
     .card {
       background: white;
       border-radius: 10px;
@@ -35,54 +63,56 @@
       max-width: 400px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-
-    .loading {
+    .loading, .empty {
       text-align: center;
       color: #888;
       margin-top: 20px;
     }
-
     .highlight {
       background: yellow;
       font-weight: bold;
     }
-
     @media (max-width: 600px) {
-      body {
-        padding: 10px;
-      }
-
-      input {
-        font-size: 18px;
-      }
-
-      .card {
-        font-size: 15px;
-      }
+      body { padding: 10px; }
+      input { font-size: 18px; }
+      .card { font-size: 15px; }
     }
   </style>
 </head>
 
 <body>
 
-<h2>🔍 Tra cứu sữa chưa nhận</h2>
-<div style="text-align:center; margin-top:10px;">
-  <p>📱 Quét QR để mở nhanh</p>
-  <img 
-    src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://elbalosnocni.github.io/sua/" 
-    alt="QR Code"
-  >
-</div>  
+  <div class="nav-tabs">
+    <a href="https://bangchamcong.pages.dev" target="_blank" class="nav-tab">📋 Chấm Công</a>
+    <a href="https://noiquy.pages.dev" target="_blank" class="nav-tab">📜 Lỗi cơm</a>
+    <a href="#" class="nav-tab active">📋 Phụ cấp sữa</a>
+    <a href="https://bhxh.pages.dev" target="_blank" class="nav-tab">🏥 BHXH</a>
+    <a href="https://rasoat.pages.dev" target="_blank" class="nav-tab">🔍 Rà soát</a>
+    <a href="https://antoan.pages.dev" target="_blank" class="nav-tab">🛡️ An Toàn</a>
+  </div>
 
-<input type="text" id="search" placeholder="Nhập tên hoặc mã NV" onkeyup="search()">
+  <h2>🔍 Tra cứu sữa chưa nhận</h2>
+  <div style="text-align:center; margin-top:10px;">
+    <p>📱 Quét QR để mở nhanh</p>
+    <img 
+      src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://elbalosnocni.github.io/sua/" 
+      alt="QR Code"
+    >
+  </div>  
 
-<div id="result"></div>
+  <!-- Bỏ onkeyup, chuyển sang lắng nghe sự kiện input ở Javascript -->
+  <input type="text" id="search" placeholder="Nhập tên hoặc mã NV">
+
+  <div id="result"></div>
 
 <script>
 const API = "https://script.google.com/macros/s/AKfycbzaA5c9l0s4X1FUaFasiY31B7fF4sFjpLM1WK8QeTH54zpjytVXUdK7klAjUPxlLXw-1g/exec";
 
-// bỏ dấu
+let searchTimeout = null;
+let currentController = null; // Dùng để hủy request cũ khi gõ tiếp
+
 function removeVietnameseTones(str) {
+  if (!str) return "";
   return str
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -91,17 +121,29 @@ function removeVietnameseTones(str) {
     .toLowerCase();
 }
 
-// highlight text
-function highlight(text, keyword) {
-  if (!keyword) return text;
-
-  const regex = new RegExp(`(${keyword})`, "gi");
-  return text.replace(regex, '<span class="highlight">$1</span>');
+// Escape các ký tự đặc biệt trong Regex để tránh lỗi crash
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function search() {
-  const input = document.getElementById("search").value;
-  const q = removeVietnameseTones(input);
+// Highlight an toàn
+function highlight(text, keyword) {
+  if (!keyword || !text) return text || "";
+  const cleanKeyword = escapeRegExp(keyword.trim());
+  if (!cleanKeyword) return text;
+
+  try {
+    const regex = new RegExp(`(${cleanKeyword})`, "gi");
+    return text.toString().replace(regex, '<span class="highlight">$1</span>');
+  } catch (e) {
+    return text;
+  }
+}
+
+function executeSearch() {
+  const inputEl = document.getElementById("search");
+  const rawInput = inputEl.value.trim();
+  const q = removeVietnameseTones(rawInput);
   const div = document.getElementById("result");
 
   if (!q) {
@@ -109,33 +151,52 @@ function search() {
     return;
   }
 
-  // loading
+  // 1. Hủy request đang chạy dở (nếu có) để chống nhảy kết quả
+  if (currentController) {
+    currentController.abort();
+  }
+  currentController = new AbortController();
+
   div.innerHTML = `<div class="loading">⏳ Đang tìm...</div>`;
 
-  fetch(API + "?q=" + encodeURIComponent(q))
+  fetch(API + "?q=" + encodeURIComponent(q), { signal: currentController.signal })
     .then(res => res.json())
     .then(data => {
       div.innerHTML = "";
 
-      if (data.length === 0) {
-        div.innerHTML = "❌ Không tìm thấy";
+      if (!data || data.length === 0) {
+        div.innerHTML = `<div class="empty">❌ Không tìm thấy</div>`;
         return;
       }
 
+      let html = "";
       data.forEach(item => {
-        div.innerHTML += `
+        html += `
           <div class="card">
-            <b>${highlight(item.ten, input)}</b><br>
-            Mã NV: ${highlight(item.ma, input)}<br>
-            Số hộp: ${item.soHop}<br>
-            Tháng chưa nhận: ${item.thang}<br>
-            Phòng: ${item.phong}<br>
-            BP: ${item.boPhan}
+            <b>${highlight(item.ten, rawInput)}</b><br>
+            Mã NV: ${highlight(item.ma, rawInput)}<br>
+            Số hộp: ${item.soHop || ''}<br>
+            Tháng chưa nhận: ${item.thang || ''}<br>
+            Phòng: ${item.phong || ''}<br>
+            BP: ${item.boPhan || ''}
           </div>
         `;
       });
+      div.innerHTML = html;
+    })
+    .catch(err => {
+      // Bỏ qua lỗi AbortError do cố tình hủy request
+      if (err.name !== 'AbortError') {
+        div.innerHTML = `<div class="empty">⚠️ Có lỗi xảy ra, vui lòng thử lại!</div>`;
+      }
     });
 }
+
+// Chờ người dùng ngừng gõ 300ms mới gửi request (Debounce)
+document.getElementById("search").addEventListener("input", function() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(executeSearch, 300);
+});
 </script>
 
 </body>
